@@ -1,0 +1,234 @@
+
+<style>
+    .INTR_CumpBar .container {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.2s ease;
+        margin-top: 0;
+    }
+    .INTR_CumpBar .container.open {
+        max-height: 500px; /* Ajusta según la cantidad máxima de elementos */
+    }
+    
+    /* Nuevo contenedor con estilo de tarjeta */
+    .INTR_CumpBar .cump-wrapper {
+        background: #fff;
+        margin: 0.5rem 0;
+        border-left: 5px solid #2196f3;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        border-radius: 5px;
+    }
+    
+    /* Título: fuente separada (ya no tarjeta) */
+    .INTR_CumpBar h1 {
+        cursor: pointer;
+        font-family: system-ui, Arial, sans-serif;
+        font-size: 1.1rem;
+        color: #114b7a;
+        text-transform: uppercase;
+        margin: 0;
+        background: none;
+        border: none;
+        box-shadow: none;
+        padding: .5rem 1rem;
+        transition: background-color .3s ease, color .3s ease;
+        text-align: center;
+    }
+    
+    /* Reemplazar regla combinada por dos separadas para asegurar persistencia */
+    .INTR_CumpBar h1:hover { 
+        background-color: #d9eaff; 
+        color: #114b7a; 
+        border-radius:0px 8px 0px 0px;
+    }
+    .INTR_CumpBar h1.active { 
+        background-color: #d9eaff; 
+        color: #114b7a; 
+        border-radius:0px 8px 0px 0px;
+    }
+
+    /* Contenido (lista) dentro del mismo contenedor, fuente separada */
+    .INTR_CumpBar .intr-cump-list ul { 
+        list-style: none; 
+        margin: 0; 
+        padding: 0; 
+    }
+    .INTR_CumpBar .intr-cump-list li {
+        color: #114b7a;
+        text-align: left;
+        font-size: inherit;
+        margin: 0.25rem 0;
+        text-transform: none;
+    }
+    .INTR_CumpBar .intr-cump-list a {
+        display: block;
+        padding: 0.1rem 1rem;
+        color: inherit;
+        text-decoration: none;
+        font-size: 16px;
+        text-align: left;            
+    }
+    .INTR_CumpBar .intr-cump-list a:hover { 
+        text-decoration: none; 
+    }
+
+    .INTR_CumpBar .intr-cump-list .no-celebraciones {
+        text-align: center;
+        font-style: italic;
+        color: #888;
+        font-size: 0.85rem;
+        padding: 0.75rem 1rem;
+    }
+
+    /* Evitar cambio de puntero al hacer hover sobre los elementos desplegables (scoped) */
+    .INTR_CumpBar .intr-cump-list li,
+    .INTR_CumpBar .intr-cump-list li a {
+        cursor: default;
+    }
+    .INTR_CumpBar .intr-cump-list li:hover,
+    .INTR_CumpBar .intr-cump-list li a:hover {
+        cursor: default;
+    }
+</style>
+
+
+<!-- Envolver en contenedor para aislar estilos -->
+<div class="INTR_CumpBar">
+    <div class="cump-wrapper">
+        <h1 class="intr-cump-toggle">CUMPLEAÑOS DEL MES</h1>
+        <div class="container intr-cump-list">
+            <!-- El contenido se cargará dinámicamente -->
+        </div>
+    </div>
+</div>
+
+<script>
+    (() => {
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vStWhI9s-R2RzvlX3AoDgoMpH3gRjEPhOMxddFpKwxkDlGzI7y_MSs_EG4OrgOfymF1hTEs6lfUMx5j/pub?gid=615706618&single=true&output=csv';
+        const rootEl = document.querySelector('.INTR_CumpBar');
+        if (!rootEl) return;
+
+        const toggleEl = rootEl.querySelector('.intr-cump-toggle');
+        const listEl = rootEl.querySelector('.intr-cump-list');
+        if (!toggleEl || !listEl) return;
+
+        let abierto = false;
+        toggleEl.addEventListener('click', () => {
+            abierto = !abierto;
+            listEl.classList.toggle('open', abierto);
+            toggleEl.classList.toggle('active', abierto);
+        });
+
+        function parseCSV(text) {
+            const rows = [];
+            let row = [], field = '', inQuotes = false;
+
+            for (let i = 0; i < text.length; i++) {
+                const c = text[i], next = text[i + 1];
+                if (inQuotes) {
+                    if (c === '"') {
+                        if (next === '"') { field += '"'; i++; }
+                        else { inQuotes = false; }
+                    } else {
+                        field += c;
+                    }
+                } else {
+                    if (c === '"') inQuotes = true;
+                    else if (c === ',') { row.push(field); field = ''; }
+                    else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+                    else if (c === '\r') { }
+                    else { field += c; }
+                }
+            }
+            if (field.length || row.length) { row.push(field); rows.push(row); }
+            return rows;
+        }
+
+        function normalizeDate(dstr) {
+            if (!dstr) return null;
+            const s = dstr.trim();
+            if (/\d{4}-\d{1,2}-\d{1,2}/.test(s)) {
+                const d = new Date(s);
+                return isNaN(d) ? null : d;
+            }
+            const mm = s.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?$/);
+            if (mm) {
+                const day = parseInt(mm[1], 10);
+                const month = parseInt(mm[2], 10) - 1;
+                const year = mm[3] ? (mm[3].length === 2 ? 2000 + parseInt(mm[3], 10) : parseInt(mm[3], 10)) : new Date().getFullYear();
+                const d = new Date(year, month, day);
+                return isNaN(d) ? null : d;
+            }
+            const d = new Date(s);
+            return isNaN(d) ? null : d;
+        }
+
+        function formatNameByWords(nombre) {
+            const words = nombre.split(/\s+/).filter(Boolean);
+            const n = words.length;
+            if (n === 3) return words.slice(0, 2).join(' ');
+            if (n === 4) return words.slice(0, 3).join(' ');
+            if (n === 5) return [words[0], words[1], words[3]].join(' ');
+            return nombre;
+        }
+
+        function formatDay(d) {
+            return d.toLocaleDateString('es-MX', { day: '2-digit' });
+        }
+
+        async function load() {
+            try {
+                const res = await fetch(CSV_URL);
+                const text = await res.text();
+                const rows = parseCSV(text);
+                if (!rows.length) return;
+
+                const header = rows[0].map(h => h.trim());
+                const idxUsuario = header.indexOf('Usuario');
+                const idxCumple = header.indexOf('Cumpleaños');
+                const idxEstatus = header.indexOf('Estatus');
+
+                if (idxUsuario === -1 || idxCumple === -1 || idxEstatus === -1) {
+                    listEl.innerHTML = '<p class="no-celebraciones">Encabezados no encontrados.</p>';
+                    return;
+                }
+
+                const now = new Date();
+                const month = now.getMonth();
+
+                const items = rows.slice(1).map(r => {
+                    const nombre = (r[idxUsuario] || '').trim();
+                    const cumpleStr = (r[idxCumple] || '').trim();
+                    const estatus = (r[idxEstatus] || '').trim().toLowerCase();
+                    const d = normalizeDate(cumpleStr);
+                    return { nombre, d, raw: cumpleStr, estatus };
+                }).filter(x => x.nombre && x.d && x.d.getMonth() === month && x.estatus === 'activo')
+                    .sort((a, b) => a.d.getDate() - b.d.getDate());
+
+                if (!items.length) {
+                    listEl.innerHTML = '<li class="no-celebraciones">No hay eventos este mes.</li>';
+                    return;
+                }
+
+                const ul = document.createElement('ul');
+                items.forEach(item => {
+                    const li = document.createElement('li');
+                    const a = document.createElement('a');
+                    const dia = formatDay(item.d);
+                    const nombreFmt = formatNameByWords(item.nombre);
+                    a.href = '#';
+                    a.innerHTML = `<strong>${dia}</strong> - ${nombreFmt}`;
+                    li.appendChild(a);
+                    ul.appendChild(li);
+                });
+                listEl.innerHTML = '';
+                listEl.appendChild(ul);
+            } catch (e) {
+                listEl.innerHTML = '<p class="no-celebraciones">Error al cargar datos.</p>';
+                console.error(e);
+            }
+        }
+
+        load();
+    })();
+</script>
