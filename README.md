@@ -1,2 +1,0 @@
-# intranet
-Descripcion de Prueba
